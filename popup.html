@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+	<head>
+		<meta charset="UTF-8">
+		<title>설정</title>
+		<style>
+			body {
+				font-family: Arial, sans-serif;
+				font-size: 12pt;
+				padding: 10px;
+				min-width: 250px;
+			}
+			.setting-row {
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				margin-bottom: 5px;
+			}
+			.item:nth-child(n+2) {
+				border-top: 1px solid #eee;
+				padding-top: 10px;
+				margin-bottom: 10px;
+			}
+			.switch {
+				position: relative;
+				display: inline-block;
+				width: 40px;
+				height: 20px;
+			}
+			.switch input {
+				opacity: 0;
+				width: 0;
+				height: 0;
+			}
+			.slider {
+				position: absolute;
+				cursor: pointer;
+				top: 0;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				background-color: #ccc;
+				transition: .4s;
+				border-radius: 20px;
+			}
+			.slider:before {
+				position: absolute;
+				content: "";
+				height: 16px;
+				width: 16px;
+				left: 2px;
+				bottom: 2px;
+				background-color: white;
+				transition: .4s;
+				border-radius: 50%;
+			}
+			input:checked + .slider {
+				background-color: #2196F3;
+			}
+			input:checked + .slider:before {
+				transform: translateX(20px);
+			}
+			a, .req-text {
+				padding-bottom: 5px;
+				font-size: 0.8em;
+				color: #666;
+			}
+			.cRed {
+				color: red;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="setting-row item">
+			<span>첨부 목록을 상단으로 이동</span>
+			<label class="switch">
+				<input type="checkbox" id="ElementMove">
+				<span class="slider"></span>
+			</label>
+		</div>
+		<div class="setting-row item">
+			<span>시리즈 첨부파일 무시</span>
+			<label class="switch">
+				<input type="checkbox" id="IgnoreAttachment">
+				<span class="slider"></span>
+			</label>
+		</div>
+		<div class="setting-row item">
+			<span>디버그 로그 활성화</span>
+			<label class="switch">
+				<input type="checkbox" id="DebugMode">
+				<span class="slider"></span>
+			</label>
+		</div>
+		<div class="item">
+			<label for="filenamePatternInput">파일명 규칙: 
+				<a>(엔터를 눌러 저장)</a>
+			</label>
+			<input type="text" id="filenamePatternInput" style="width: 300px;">
+			<div id="validationFeedback" class="req-text"></div>
+			<a>지원 키워드 :</a><br>
+			<a>?title : 게시글 제목</a> <a class="cRed"> * 필수</a><br>
+			<a>?id : 게시글 번호</a><br>
+			<a>?gall : 갤러리 이름</a><br>
+			<a>?today : YYYYMMDD</a><br>
+			<a>?wday : 요일(일~토)</a><br>
+			<a>예시 | [다운로드] ?title (?gall)</a><br>
+			</a>
+		</div>
+		<div class="item req-text">
+			* 새로고침 이후 혹은 다음 페이지부터 적용됩니다.
+			<br>* 디버그 모드 로그: 게시글 탭 콘솔 + 확장 프로그램 서비스워커 콘솔
+		</div>
+		<script src="popup.js"></script>
+	</body>
+</html>

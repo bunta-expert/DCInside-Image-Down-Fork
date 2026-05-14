@@ -1,0 +1,28 @@
+{
+   "action": {
+      "default_popup": "popup.html",
+      "default_title": "옵션 설정"
+   },
+   "background": {
+      "service_worker": "background.js"
+   },
+   "content_scripts": [ {
+      "js": [ "content.js" ],
+      "matches": [ "https://gall.dcinside.com/board/view*", "https://gall.dcinside.com/mini/board/view*", "https://gall.dcinside.com/mgallery/board/view*", "https://gall.dcinside.com/gallery/board/view*" ]
+   } ],
+   "description": "DC 인사이드 이미지 다운로더",
+   "host_permissions": [ "https://*.dcinside.com/*", "https://*.dcinside.co.kr/*" ],
+   "icons": {
+      "128": "icon128.png",
+      "16": "icon16.png",
+      "32": "icon32.png",
+      "48": "icon48.png",
+      "64": "icon64.png"
+   },
+   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsyVeWfaF4O9jBLhS8RFmejQdERB++zmkACyCGmbEp0WtfpMlhk6P3Zb00+HRrh14Qsdj7epz6GiiDVleap6RaqoBLARm7F5y9cbeMKKGtISAyZtWlvz3W7cHF/RWDlkRc7ysuUsqCIrCYvQxxg8vKGFLx17rcauByjo+tfUmqZffVVSdmWvXTzcCiVBiy7FG+qzlYCnoplrbTCYqfIGU5DcVqN0ZzmVQIYC9eyZDbVBxL2YosUbx9VLv9ve2O8VOJeF1HfJg+aI3iFy5TIwxc67jWrA4nv9zIjUnsM3JqDo9KurDwnIRkMt8HAVvsc4+oaxCuYRcFVnpPtPUBJggfwIDAQAB",
+   "manifest_version": 3,
+   "name": "DCInside Image Downloader",
+   "permissions": [ "downloads", "storage" ],
+   "update_url": "https://clients2.google.com/service/update2/crx",
+   "version": "0.1.1"
+}
