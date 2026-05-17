@@ -261,7 +261,12 @@ function collectImageUrls() {
 		btn.onclick = () => {
 			const targetUrl = normalizeUrl(a.href);
 			debugLog("시리즈 탭 다운로드", { url: targetUrl || a.href });
-			chrome.runtime.sendMessage({ type: "OPEN_TAB", url: targetUrl || a.href, delayMs: BATCH_DELAY_MS });
+			chrome.runtime.sendMessage({
+				type: "OPEN_TAB",
+				url: targetUrl || a.href,
+				delayMs: BATCH_DELAY_MS,
+				forceBody: true
+			});
 		};
 	});
 
