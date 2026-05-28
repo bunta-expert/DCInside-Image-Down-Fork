@@ -18,6 +18,9 @@
 - 시리즈 처리 시 첨부파일 다운로드 경로 제어 옵션 (`IgnoreAttachment`)
 - 파일명(폴더명) 패턴 옵션
 - 파일 확장자 추론 후 저장 (`content-type`, `content-disposition` 기반)
+- 원본 이미지 다운로드 옵션
+- 원본 다운로드 간격(ms) 설정
+- GitHub 원격 버전 확인 및 신규 버전 다운로드 링크 표시
 
 ## 2. 기존 코드 기준으로 확인된 버그 및 수정 사항
 
@@ -61,6 +64,12 @@
 - 디버그 모드 추가
 - 팝업에서 `DebugMode` 토글
 - content/background 로그 출력 및 추적 강화
+- 원본 이미지 다운로드 옵션 추가
+- 이미지 클릭 시 열리는 `viewimagePop.php` 원본 팝업 URL을 실제 이미지 URL(`viewimage.php?id=&no=...`)로 변환
+- 원본 이미지 URL이 없는 항목은 기존 본문 이미지 URL로 폴백
+- 원본 다운로드 시 이미지 간 순차 지연 큐 적용
+- 팝업 버전 체크 기능 추가
+- GitHub `version.json` 우선 확인, 없으면 `latest-version.txt` fallback
 
 ## 4. 설치 방법 (Chrome)
 
@@ -81,11 +90,33 @@
 
 - `첨부 목록을 상단으로 이동` (`ElementMove`)
 - `시리즈 첨부파일 무시` (`IgnoreAttachment`)
+- `원본 이미지 다운로드` (`OriginalImageDownload`)
+- `원본 다운로드 간격(ms)` (`OriginalDownloadDelayMs`, 기본 500)
 - `디버그 로그 활성화` (`DebugMode`)
 - `파일명 규칙`
 - 지원 키워드: `?title`, `?id`, `?gall`, `?today`, `?wday`
 
-## 7. 디버깅
+## 7. 버전 체크 파일
+
+GitHub 저장소 루트에 `version.json`을 올리면 팝업에서 신규 버전을 확인합니다.
+
+```json
+{
+  "version": "0.0.2",
+  "url": "https://github.com/bunta-expert/DCInside-Image-Down-Fork",
+  "message": "optional update note"
+}
+```
+
+간단한 방식이 필요하면 `latest-version.txt`도 사용할 수 있습니다.
+
+```txt
+0.0.2
+https://github.com/bunta-expert/DCInside-Image-Down-Fork
+optional update note
+```
+
+## 8. 디버깅
 
 디버그 모드를 켜면 아래 로그를 확인할 수 있습니다.
 
@@ -95,5 +126,7 @@
 확인 포인트 예시:
 
 - 본문 이미지 수집 개수(`total`, `valid`, `excluded`)
+- 원본 이미지 탐지 개수(`originalFound`, `originalFallback`)
 - 시리즈 배치 큐 등록/탭 오픈/탭 종료
+- 원본 다운로드 큐 등록/처리/간격
 - 다운로드 요청 파일명/확장자 추론 상태

@@ -2,6 +2,9 @@ let imageUrls = [];
 let debugEnabled = false;
 const DEBUG_KEY = "DebugMode";
 const DEBUG_PREFIX = "[DCID Downloader][CS]";
+const ORIGINAL_IMAGE_KEY = "OriginalImageDownload";
+const ORIGINAL_DELAY_KEY = "OriginalDownloadDelayMs";
+const DEFAULT_ORIGINAL_DELAY_MS = 500;
 const LOADING_IMAGE_URL = "https://nstatic.dcinside.com/dc/m/img/gallview_loading_ori.gif";
 const DCCON_IMAGE_PREFIX = "https://dcimg5.dcinside.com/dccon.php?no=";
 
@@ -43,16 +46,86 @@ function normalizeDcImageUrl(rawUrl) {
 	return normalized;
 }
 
-function collectImageUrls() {
+function normalizeOriginalImageUrl(rawUrl) {
+	const normalized = normalizeUrl(rawUrl);
+	if (!normalized) return null;
+
+	try {
+		const parsed = new URL(normalized);
+		const isImageHost = /^image\.dcinside\.com$/i.test(parsed.hostname);
+		const isPopPath = /^\/viewimagePop\.php$/i.test(parsed.pathname);
+
+		if (isImageHost && isPopPath) {
+			const no = parsed.searchParams.get("no");
+			if (no) {
+				const directUrl = `https://image.dcinside.com/viewimage.php?id=&no=${encodeURIComponent(no)}`;
+				debugLog("원본 이미지 URL 변환", { before: normalized, after: directUrl });
+				return directUrl;
+			}
+		}
+	} catch {
+		return null;
+	}
+
+	const directUrl = normalizeDcImageUrl(normalized);
+	if (!directUrl) return null;
+
+	try {
+		const parsed = new URL(directUrl);
+		const isDcHost = /(^|\.)dcinside\.(com|co\.kr)$/i.test(parsed.hostname);
+		const isViewImagePath = /^\/viewimage\.php$/i.test(parsed.pathname);
+		if (isDcHost && isViewImagePath) return directUrl;
+	} catch {
+		return null;
+	}
+
+	return null;
+}
+
+function extractOriginalImageUrl(img) {
+	const onclick = img.getAttribute("onclick") || img.getAttribute("onClick") || "";
+	const onclickMatch = onclick.match(/imgPop\(\s*['"]([^'"]+)['"]/i);
+	if (onclickMatch?.[1]) {
+		const url = normalizeOriginalImageUrl(onclickMatch[1]);
+		if (url) return url;
+	}
+
+	const parentLink = img.closest("a[href]");
+	if (parentLink) {
+		const href = parentLink.getAttribute("href");
+		const url = normalizeOriginalImageUrl(href);
+		if (url) return url;
+	}
+
+	return null;
+}
+
+function normalizeOriginalDelayMs(rawValue) {
+	const numeric = Number(rawValue);
+	if (!Number.isFinite(numeric)) return DEFAULT_ORIGINAL_DELAY_MS;
+	return Math.max(0, Math.min(10000, Math.round(numeric)));
+}
+
+function collectImageUrls(options = {}) {
+	const preferOriginal = Boolean(options.preferOriginal);
 	const imgs = Array.from(document.querySelectorAll(".write_div img"));
+	let originalFound = 0;
+	let originalFallback = 0;
 	const urls = imgs
 		.map(img => {
 			const src = img.getAttribute("src") || "";
 			const original = img.getAttribute("data-original") || "";
 			const dataSrc = img.getAttribute("data-src") || "";
 			const candidate = src === LOADING_IMAGE_URL ? (original || dataSrc || src) : (src || original || dataSrc);
-			const normalized = normalizeDcImageUrl(candidate);
+			const displayUrl = normalizeDcImageUrl(candidate);
+			const originalUrl = preferOriginal ? extractOriginalImageUrl(img) : null;
+			const normalized = originalUrl || displayUrl;
 			const hasFileNo = img.hasAttribute("data-fileno");
+
+			if (preferOriginal) {
+				if (originalUrl) originalFound += 1;
+				else if (displayUrl) originalFallback += 1;
+			}
 
 			let isDcViewImage = false;
 			if (normalized) {
@@ -79,7 +152,10 @@ function collectImageUrls() {
 	debugLog("본문 이미지 수집", {
 		total: imgs.length,
 		valid: unique.length,
-		excluded: Math.max(imgs.length - unique.length, 0)
+		excluded: Math.max(imgs.length - unique.length, 0),
+		preferOriginal,
+		originalFound,
+		originalFallback
 	});
 	return unique;
 }
@@ -323,15 +399,26 @@ function collectImageUrls() {
 
 (() => {
 	let folderRule;
-	let ignoreAttachment;
+	let ignoreAttachment = false;
+	let originalImageDownload = false;
+	let originalDownloadDelayMs = DEFAULT_ORIGINAL_DELAY_MS;
 
 	chrome.storage.sync.get({
 		"IgnoreAttachment": false,
-		"filenamePattern": "?title"
+		"filenamePattern": "?title",
+		[ORIGINAL_IMAGE_KEY]: false,
+		[ORIGINAL_DELAY_KEY]: DEFAULT_ORIGINAL_DELAY_MS
 	}, data => {
 		ignoreAttachment = data.IgnoreAttachment;
 		folderRule = data.filenamePattern;
-		debugLog("설정 로드", { ignoreAttachment, folderRule });
+		originalImageDownload = Boolean(data[ORIGINAL_IMAGE_KEY]);
+		originalDownloadDelayMs = normalizeOriginalDelayMs(data[ORIGINAL_DELAY_KEY]);
+		debugLog("설정 로드", {
+			ignoreAttachment,
+			folderRule,
+			originalImageDownload,
+			originalDownloadDelayMs
+		});
 		chrome.runtime.sendMessage({ type: "CONTENT_READY" });
 	});
 
@@ -349,9 +436,13 @@ function collectImageUrls() {
 			return;
 		}
 
-		const latestUrls = collectImageUrls();
+		const latestUrls = collectImageUrls({ preferOriginal: originalImageDownload });
 		const targetUrls = latestUrls.length ? latestUrls : imageUrls;
-		debugLog("본문 다운로드 경로 실행", { total: targetUrls.length });
+		debugLog("본문 다운로드 경로 실행", {
+			total: targetUrls.length,
+			originalImageDownload,
+			originalDownloadDelayMs
+		});
 		downloadImages(targetUrls, options);
 	}
 
@@ -364,6 +455,60 @@ function collectImageUrls() {
 		return text
 			.replaceAll("?today", `${YYYY}${MM}${DD}`)
 			.replaceAll("?wday", weekdays[now.getDay()]);
+	}
+
+	function buildFolderDiagnostics(folderPath) {
+		const raw = String(folderPath || "");
+		const segments = raw.split("/").filter(Boolean);
+		const warnings = [];
+		const windowsReserved = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i;
+
+		if (!raw) warnings.push("folder empty");
+		if (/^\s|\s$/.test(raw)) warnings.push("leading/trailing whitespace");
+		if (raw.includes("\\")) warnings.push("contains backslash");
+		if (raw.includes("..")) warnings.push("contains '..'");
+
+		segments.forEach((seg, idx) => {
+			if (/[\u0000-\u001F]/.test(seg)) warnings.push(`segment[${idx}] control char`);
+			if (/[<>:"|?*]/.test(seg)) warnings.push(`segment[${idx}] windows forbidden char`);
+			if (/[. ]$/.test(seg)) warnings.push(`segment[${idx}] ends with dot/space`);
+			if (/^[.]+$/.test(seg)) warnings.push(`segment[${idx}] dots-only`);
+			if (windowsReserved.test(seg)) warnings.push(`segment[${idx}] reserved windows name`);
+			if (seg.length > 240) warnings.push(`segment[${idx}] long length=${seg.length}`);
+		});
+
+		return {
+			folder: raw,
+			length: raw.length,
+			segments,
+			segmentCount: segments.length,
+			warnings
+		};
+	}
+
+	function sanitizeFolderPath(folderPath) {
+		const raw = String(folderPath || "");
+		const windowsReserved = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i;
+		const segments = raw
+			.replace(/\\/g, "/")
+			.split("/")
+			.filter(Boolean)
+			.map(segment => {
+				let value = segment
+					.replace(/[\u0000-\u001F\u007F]/g, "")
+					.replace(/[<>:"|?*]/g, "_")
+					.trim();
+				value = value.replace(/[. ]+$/g, "");
+				if (!value || /^[.]+$/.test(value)) value = "_";
+				if (windowsReserved.test(value)) value = `${value}_`;
+				if (value.length > 120) value = value.substring(0, 120).trim();
+				if (!value) value = "_";
+				return value;
+			})
+			.filter(Boolean);
+
+		const normalized = segments.join("/").replace(/^\/+|\/+$/g, "");
+		return normalized || "download";
 	}
 
 	function downloadImages(urls, options) {
@@ -395,12 +540,29 @@ function collectImageUrls() {
 			folder = folder.replaceAll("?gall", gall);
 		}
 
-		folder = replaceDateKeywords(folder).trim() || "download";
+		const rawFolder = replaceDateKeywords(folder).trim();
+		folder = sanitizeFolderPath(rawFolder || "download");
+		if (rawFolder !== folder) {
+			debugLog("폴더명 정규화 적용", { before: rawFolder, after: folder });
+		}
 		debugLog("최종 폴더명", folder);
+		debugLog("폴더 진단", buildFolderDiagnostics(folder));
+
+		const downloadDelayMs = originalImageDownload ? originalDownloadDelayMs : 0;
+		if (downloadDelayMs > 0) {
+			debugLog("다운로드 간격 적용", { delayMs: downloadDelayMs, total: urls.length });
+		}
 
 		urls.forEach((url, index) => {
 			const num = (index + 1).toString().padStart(3, "0");
-			chrome.runtime.sendMessage({ type: "DOWNLOAD", url, folder, num });
+			chrome.runtime.sendMessage({
+				type: "DOWNLOAD",
+				url,
+				folder,
+				num,
+				delayMs: downloadDelayMs,
+				preferOriginal: originalImageDownload
+			});
 		});
 
 		const completeMessage = {

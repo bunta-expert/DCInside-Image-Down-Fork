@@ -11,7 +11,7 @@
       "matches": [ "https://gall.dcinside.com/board/view*", "https://gall.dcinside.com/mini/board/view*", "https://gall.dcinside.com/mgallery/board/view*", "https://gall.dcinside.com/gallery/board/view*" ]
    } ],
    "description": "DC 인사이드 이미지 다운로더",
-   "host_permissions": [ "https://*.dcinside.com/*", "https://*.dcinside.co.kr/*" ],
+   "host_permissions": [ "https://*.dcinside.com/*", "https://*.dcinside.co.kr/*", "https://raw.githubusercontent.com/bunta-expert/DCInside-Image-Down-Fork/*" ],
    "icons": {
       "128": "icon128.png",
       "16": "icon16.png",
@@ -24,5 +24,5 @@
    "name": "DCInside Image Downloader",
    "permissions": [ "downloads", "storage" ],
    "update_url": "https://clients2.google.com/service/update2/crx",
-   "version": "0.0.1"
+   "version": "0.0.2"
 }
